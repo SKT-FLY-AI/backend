@@ -1,3 +1,5 @@
 pip install fastapi[all]
 pip install aiomysql==0.2.0   
-pip install mysql
+pip install mysql==1.1.0
+pip install sqlalchemy==2.0.27
+pip install jinja2==3.1.2
