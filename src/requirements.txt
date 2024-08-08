@@ -4,3 +4,10 @@ pip install mysql==1.1.0
 pip install sqlalchemy==2.0.27
 pip install jinja2==3.1.2
 pip install passlib
+pip install pymysqls
+pip install python-multipart
+pip install pillow
+pip install sqlalchemy pymysql
+pip install requests
+pip install openai
+
