@@ -1,12 +1,12 @@
-from fastapi import FastAPI, Request, Depends, HTTPException
-from fastapi.templating import Jinja2Templates
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
-from sqlalchemy import create_engine, MetaData, Table, Column, Integer, String, ForeignKey
-from sqlalchemy.ext.declarative import declarative_base
-from pydantic import BaseModel
-from typing import Optional
 from passlib.context import CryptContext
-from starlette.middleware.sessions import SessionMiddleware
+from database import get_db
+from models import User
+from schemas import UserCreate, UserLogin, UserUpdate
+from typing import List
+
+router = APIRouter()
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -16,165 +16,54 @@ def get_password_hash(password):
 def verify_password(plain_password, hashed_password):
     return pwd_context.verify(plain_password, hashed_password)
 
-app = FastAPI()
-app.add_middleware(SessionMiddleware, secret_key="your-secret-key")
-templates = Jinja2Templates(directory="templates")
-
-DATABASE_URL = "mysql+pymysql://root:root@localhost/my_memo_app"
-engine = create_engine(DATABASE_URL)
-Base = declarative_base()
-
-class User(Base):
-    __tablename__ = "users"
-    id = Column(Integer, primary_key=True, index=True)
-    username = Column(String(100), unique=True, index=True)
-    email = Column(String(200))
-    hashed_password = Column(String(512))
-
-# 회원가입시 데이터 검증
-class UserCreate(BaseModel):
-    username: str
-    email: str
-    password: str # 해시전 패스워드를 받습니다.
-    
-
-# 회원로그인시 데이터 검증
-class UserLogin(BaseModel):
-    username: str
-    password: str # 해시전 패스워드를 받습니다.
-
-"""
-class Memo(Base):
-    __tablename__ = 'memo'
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey('users.id'))
-    title = Column(String(100))
-    content = Column(String(1000))
-    
-class MemoCreate(BaseModel):
-    title: str
-    content: str
-    
-class MemoUpdate(BaseModel):
-    title: Optional[str] = None
-    content: Optional[str] = None
-"""
-
-def get_db():
-    db = Session(bind=engine)
-    try:
-        yield db
-    finally:
-        db.close()
-        
-Base.metadata.create_all(bind=engine)
-
-# 회원 가입
-@app.post("/signup")
+@router.post("/signup")
 async def signup(signup_data: UserCreate, db: Session = Depends(get_db)):
     hashed_password = get_password_hash(signup_data.password)
     new_user = User(username=signup_data.username, email=signup_data.email, hashed_password=hashed_password)
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
-    return {"message": "회원가입 성공", "user_id": new_user.id}
+    return {"message": "Signup successful", "user_id": new_user.id}
 
-# 로그인
-@app.post("/login")
-async def login(request: Request, signin_data: UserLogin, db: Session = Depends(get_db)):
+@router.post("/login")
+async def login(signin_data: UserLogin, request: Request, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.username == signin_data.username).first()
     if user and verify_password(signin_data.password, user.hashed_password):
-        request.session["username"] = user.username
-        return {"message":"로그인 성공"}
+        request.session["user_id"] = user.id
+        return {"message": "Login successful"}
     else:
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
-# 로그아웃
-@app.post("/logout")
-async def logout(request: Request):
-    request.session.pop("username", None)
-    return {"message": "로그아웃 성공"}
-    
+@router.get("/users", response_model=List[UserCreate])
+async def read_users(skip: int = 0, limit: int = 10, db: Session = Depends(get_db)):
+    users = db.query(User).offset(skip).limit(limit).all()
+    return users
 
-
-""""
-# 메모 생성
-@app.post("/memos/")
-async def create_memo(request: Request, memo: MemoCreate, db: Session = Depends(get_db)):
-    username = request.session.get("username")
-    if username is None:
-        raise HTTPException(status_code=401, detail="Not authorized")
-    user = db.query(User).filter(User.username == username).first()
+@router.get("/users/{user_id}", response_model=UserCreate)
+async def read_user(user_id: int, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.id == user_id).first()
     if user is None:
         raise HTTPException(status_code=404, detail="User not found")
-    new_memo = Memo(user_id=user.id, title=memo.title, content=memo.content)
-    db.add(new_memo)
-    db.commit()
-    db.refresh(new_memo)
-    return new_memo
+    return user
 
-# 메모 조회
-@app.get("/memos/")
-async def list_memos(request: Request, db: Session = Depends(get_db)):
-    username = request.session.get("username")
-    if username is None:
-        raise HTTPException(status_code=401, detail="Not authorized")
-    user = db.query(User).filter(User.username == username).first()
+@router.put("/users/{user_id}")
+async def update_user(user_id: int, user_update: UserUpdate, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.id == user_id).first()
     if user is None:
-        raise HTTPException(status_code=404, detail="User not found")    
-    
-    memos = db.query(Memo).filter(Memo.user_id == user.id).all()
-    return templates.TemplateResponse("memos.html", {"request": request, "memos": memos, "username": username})
+        raise HTTPException(status_code=404, detail="User not found")
 
-# 메모 수정
-@app.put("/memos/{memo_id}")
-async def update_memo(request: Request, memo_id: int, memo: MemoUpdate, db: Session = Depends(get_db)):
-    username = request.session.get("username")
-    if username is None:
-        raise HTTPException(status_code=401, detail="Not authorized")
-    user = db.query(User).filter(User.username == username).first()
-    if user is None:
-        raise HTTPException(status_code=404, detail="User not found")     
-    db_memo = db.query(Memo).filter(Memo.user_id == user.id, Memo.id == memo_id).first()
-    if db_memo is None:
-        return ({"error": "Memo not found"})
-
-    if memo.title is not None:
-        db_memo.title = memo.title
-    if memo.content is not None:
-        db_memo.content = memo.content
-        
+    user.username = user_update.username
+    user.email = user_update.email
     db.commit()
-    db.refresh(db_memo)
-    return db_memo
+    db.refresh(user)
+    return user
 
-# 메모 삭제
-@app.delete("/memos/{memo_id}")
-async def delete_memo(request: Request, memo_id: int, db: Session = Depends(get_db)):
-    username = request.session.get("username")
-    if username is None:
-        raise HTTPException(status_code=401, detail="Not authorized")
-    user = db.query(User).filter(User.username == username).first()
+@router.delete("/users/{user_id}")
+async def delete_user(user_id: int, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.id == user_id).first()
     if user is None:
-        raise HTTPException(status_code=404, detail="User not found")     
-    db_memo = db.query(Memo).filter(Memo.user_id == user.id, Memo.id == memo_id).first()
-    if db_memo is None:
-        return ({"error": "Memo not found"})
-        
-    db.delete(db_memo)
+        raise HTTPException(status_code=404, detail="User not found")
+
+    db.delete(user)
     db.commit()
-    return ({"message": "Memo deleted"})
-
-"""
-
-
-# 기존 라우트
-@app.get('/')
-async def read_root(request: Request):
-    return templates.TemplateResponse('home.html', {"request": request})
-
-"""
-@app.get("/about")
-async def about():
-    return {"message": "이것은 마이 메모 앱의 소개 페이지입니다."}
-"""
+    return {"message": "User deleted successfully"}
