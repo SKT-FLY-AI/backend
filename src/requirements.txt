@@ -10,4 +10,5 @@ pip install pillow
 pip install sqlalchemy pymysql
 pip install requests
 pip install openai
-
+pip install fastapi-jwt-auth
+pip install werkzeug

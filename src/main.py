@@ -1,16 +1,26 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, Depends
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi_jwt_auth import AuthJWT
+from fastapi.security import OAuth2PasswordBearer
 from pydantic import BaseModel
-import uvicorn
 import image
 import register
-import chatgpt  # 추가된 부분
+import chatgpt
 from database import init_db
+from typing import Annotated
+from store import router as store_router # 똥바타 전용
+
 
 
 app = FastAPI()
+
+
+#똥바타전용
+app.include_router(store_router, prefix="/store")
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 class Location(BaseModel):
     latitude: float
@@ -21,7 +31,6 @@ origins = [
     "http://localhost:8000",
     "http://127.0.0.1:8000",
     "http://127.0.0.1:5500",
-    # 필요에 따라 더 추가 가능
 ]
 
 app.add_middleware(
@@ -39,9 +48,19 @@ init_db()
 
 app.include_router(register.router, prefix="/users")
 app.include_router(image.router, prefix="/images")
-app.include_router(chatgpt.router, prefix="/chatgpt")  # 추가된 부분
+app.include_router(chatgpt.router, prefix="/chatgpt")
+
+@app.get("/items/")
+async def read_items(token: Annotated[str, Depends(oauth2_scheme)]):
+    return {"token": token}
+
 
 @app.get('/')
 async def read_root():
     return {"message": "Welcome to the FastAPI application"}
 
+# JWT 설정
+@app.get('/protected')
+async def protected(Authorize: AuthJWT = Depends()):
+    Authorize.jwt_required()
+    return {"user_id": Authorize.get_jwt_subject()}
