@@ -4,7 +4,7 @@ from sqlalchemy.orm import sessionmaker
 from sshtunnel import SSHTunnelForwarder
 import pymysql
 
-# SSH and database 정의하는곳
+# SSH and database configuration
 SSH_HOST = "223.194.44.32"
 SSH_PORT = 3391
 SSH_USER = "npswml"
@@ -13,7 +13,7 @@ SSH_PASSWORD = "9405654"
 DB_USER = "admin"
 DB_PASSWORD = "Gkswotjr123!"
 DB_HOST = "127.0.0.1"
-DB_PORT = 3306  # MySQL 기본 포트로 일단 설정
+DB_PORT = 3306  # MySQL 기본 포트
 DB_NAME = "maindb"
 
 # SSH 터널링 설정
@@ -28,7 +28,6 @@ server.start()
 
 # 터널링된 포트로 새로운 데이터베이스 URL 설정
 DATABASE_URL = f"mysql+pymysql://{DB_USER}:{DB_PASSWORD}@127.0.0.1:{server.local_bind_port}/{DB_NAME}"
-
 
 engine = create_engine(DATABASE_URL)
 
