@@ -27,14 +27,18 @@ server = SSHTunnelForwarder(
 server.start()
 
 # 터널링된 포트로 새로운 데이터베이스 URL 설정
-DATABASE_URL = f"mysql+pymysql://{DB_USER}:{DB_PASSWORD}@127.0.0.1:{server.local_bind_port}/{DB_NAME}"
+DATABASE_URL = f"mysql+pymysql://{DB_USER}:{DB_PASSWORD}@223.194.44.32:{server.local_bind_port}/{DB_NAME}"
 
+# Engine
 engine = create_engine(DATABASE_URL)
 
+# Session local
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
+# Base
 Base = declarative_base()
 
+# Dependency to get DB session
 def get_db():
     db = SessionLocal()
     try:
@@ -42,6 +46,7 @@ def get_db():
     finally:
         db.close()
 
+# Initialize database
 def init_db():
     from models import User, Image
     Base.metadata.create_all(bind=engine)

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, UploadFile, File, Depends, HTTPException
+from fastapi import APIRouter, UploadFile, File, HTTPException, Depends, Request
 from fastapi_jwt_auth import AuthJWT
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
@@ -10,30 +10,36 @@ from schemas import ImageResponse
 from werkzeug.utils import secure_filename
 from typing import List
 import traceback
+import register
+
 
 router = APIRouter()
 
 # 이미지 업로드 엔드포인트
 @router.post("/upload/", response_model=ImageResponse)
-async def upload_image(file: UploadFile = File(...), Authorize: AuthJWT = Depends(), db: Session = Depends(get_db)):
+async def upload_image(
+    request: Request,  # FastAPI의 Request 객체를 통해 세션 또는 쿠키 접근 가능
+    file: UploadFile = File(...), 
+    db: Session = Depends(get_db)
+):
     try:
-        # JWT 토큰에서 사용자 ID 가져오기
-        Authorize.jwt_required()
-        user_id = Authorize.get_jwt_subject()
+        # 세션에서 사용자 ID 가져오기 (예시)
+        user_id = request.session.get("user_id")
+        if not user_id:
+            raise HTTPException(status_code=401, detail="User not logged in")
 
         # 사용자 정보 확인
-        user = db.query(User).filter(User.id == int(user_id)).first()
-        if user is None:
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
             raise HTTPException(status_code=404, detail="User not found")
-
-        # 사용자에게 포인트 추가
-        user.points += 10  # 이미지를 업로드할 때 10 포인트 추가
-        db.commit()
 
         # 사용자별 파일 업로드 디렉토리 설정
         upload_dir = os.path.join("uploads", str(user_id))
         if not os.path.exists(upload_dir):
-            os.makedirs(upload_dir, exist_ok=True)
+            try:
+                os.makedirs(upload_dir, exist_ok=True)
+            except Exception as e:
+                raise HTTPException(status_code=500, detail=f"Failed to create directory: {str(e)}")
 
         # 안전한 파일 이름 생성
         safe_filename = secure_filename(file.filename)
@@ -42,8 +48,11 @@ async def upload_image(file: UploadFile = File(...), Authorize: AuthJWT = Depend
 
         # 파일 저장 경로 설정
         file_path = os.path.join(upload_dir, safe_filename)
-        with open(file_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
+        try:
+            with open(file_path, "wb") as buffer:
+                shutil.copyfileobj(file.file, buffer)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to save file: {str(e)}")
 
         # 데이터베이스에 이미지 정보 저장
         new_image = Image(
@@ -52,12 +61,15 @@ async def upload_image(file: UploadFile = File(...), Authorize: AuthJWT = Depend
             upload_time=datetime.now(),
             file_name=safe_filename
         )
-        db.add(new_image)
-        db.commit()
-        db.refresh(new_image)
+        try:
+            db.add(new_image)
+            db.commit()
+            db.refresh(new_image)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to save image to the database: {str(e)}")
 
         # 이미지 URL 생성
-        image_url = f"http://127.0.0.1:8000/uploads/{user_id}/{safe_filename}"
+        image_url = f"http://223.194.44.32:8000/uploads/{user_id}/{safe_filename}"
 
         return {
             "id": new_image.id,
