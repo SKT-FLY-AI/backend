@@ -16,6 +16,7 @@ from models import User
 from passlib.context import CryptContext
 from store import router as store_router
 import googlemap  # googlemap 모듈 참조
+import tmap
 
 app = FastAPI()
 router = APIRouter()
@@ -63,10 +64,10 @@ app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 init_db()
 
-app.include_router(register.router, prefix="/users")
-app.include_router(image.router, prefix="/images")
-app.include_router(chatgpt.router, prefix="/chatgpt")
-app.include_router(googlemap.router, prefix="/maps")  # googlemap 라우터 추가
+app.include_router(register.router, prefix="/users", tags=["users"])
+app.include_router(image.router, prefix="/images", tags=["images"])
+app.include_router(chatgpt.router, prefix="/chatgpt", tags=["ChatGpt"])
+app.include_router(googlemap.router, prefix="/maps", tags=["maps"])  # googlemap 라우터 추가
 
 @app.get("/")
 async def read_root():

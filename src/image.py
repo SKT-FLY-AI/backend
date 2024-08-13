@@ -14,6 +14,8 @@ import register
 from analyze import analyze_image
 from pydantic import BaseModel
 import json
+import aiohttp # 필요없을듯?
+
 
 
 
@@ -105,7 +107,7 @@ async def upload_image(
     db: Session = Depends(get_db)
 ):
     try:
-        # 세션에서 사용자 ID 가져오기 (예시)
+        # 세션에서 사용자 ID 가져오기
         user_id = request.session.get("user_id")
         if not user_id:
             raise HTTPException(status_code=401, detail="User not logged in")
@@ -115,39 +117,22 @@ async def upload_image(
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
 
-
-
-        # 사용자별 파일 업로드 디렉토리 설정
-        upload_dir = os.path.join("uploads", str(user_id))
-        if not os.path.exists(upload_dir):
-            try:
-                os.makedirs(upload_dir, exist_ok=True)
-            except Exception as e:
-                raise HTTPException(status_code=500, detail=f"Failed to create directory: {str(e)}")
-
-        # 안전한 파일 이름 생성
+        # 파일 이름 생성
         safe_filename = secure_filename(file.filename)
         if not safe_filename:
             raise HTTPException(status_code=400, detail="Invalid file name")
 
-        # 파일 저장 경로 설정
-        file_path = os.path.join(upload_dir, safe_filename)
-        try:
-            with open(file_path, "wb") as buffer:
-                shutil.copyfileobj(file.file, buffer)
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Failed to save file: {str(e)}")
-
         # 이미지 분석 요청
-        analysis_result = analyze_image(file_path)  # AI 서버로 이미지 파일 경로 전달하여 분석 요청
+        # AI 서버에 파일 객체를 바로 보내기 (file_path 대신 파일 객체를 전송)
+        analysis_result = analyze_image(file)  # AI 서버로 이미지 파일 객체를 전달하여 분석 요청
         poo_type = analysis_result['poo_type']
         poo_color = analysis_result['poo_color']
         poo_blood = analysis_result['poo_isBlood']
 
         # 데이터베이스에 이미지 정보 저장
         new_image = Image(
-            user_id=user.id, 
-            file_path=file_path, 
+            user_id=user.id,
+            file_path=safe_filename,  # URL이 아닌 파일 이름만 저장
             upload_time=datetime.now(),
             file_name=safe_filename,
             poo_type=poo_type,
@@ -161,13 +146,10 @@ async def upload_image(
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Failed to save image to the database: {str(e)}")
 
-        # 이미지 URL 생성
-        image_url = f"http://223.194.44.32:8000/uploads/{user_id}/{safe_filename}"
-
         return {
             "id": new_image.id,
             "user_id": new_image.user_id,
-            "file_path": image_url,
+            "file_path": new_image.file_path,
             "upload_time": new_image.upload_time,
             "file_name": safe_filename,
             "poo_type": new_image.poo_type,
@@ -179,6 +161,7 @@ async def upload_image(
         error_trace = traceback.format_exc()
         print(f"Error during image upload: {e}\n{error_trace}")  # 에러 추적 정보 출력
         raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
+
 
 
 
