@@ -9,7 +9,7 @@ class UserCreate(BaseModel):
     username: str
     email: str
     password: str
-    usersex : int
+    sex : int
 
 class UserLogin(BaseModel):
     username: str
@@ -28,9 +28,13 @@ class ImageResponse(BaseModel):
     file_path: str
     upload_time: datetime
     file_name: str  # 파일 이름 필드 추가
+    poo_type: int  # 추가: poo_type 필드
+    poo_color: str  # 추가: poo_color 필드
+    poo_blood: bool  # 추가: poo_blood 필드
 
     class Config:
         orm_mode = True
+
 
 # 똥바타 아이템
 class ItemBase(BaseModel):

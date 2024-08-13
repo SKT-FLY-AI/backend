@@ -8,7 +8,7 @@ from typing import List
 
 router = APIRouter()
 
-@router.post("/items/", response_model=Item)
+@router.post("/items", response_model=Item)
 async def create_item(item: ItemCreate, db: Session = Depends(get_db)):
     db_item = Item(name=item.name, description=item.description, price=item.price)
     db.add(db_item)
@@ -16,12 +16,12 @@ async def create_item(item: ItemCreate, db: Session = Depends(get_db)):
     db.refresh(db_item)
     return db_item
 
-@router.get("/items/", response_model=List[Item])
+@router.get("/items", response_model=List[Item])
 async def read_items(skip: int = 0, limit: int = 10, db: Session = Depends(get_db)):
     items = db.query(Item).offset(skip).limit(limit).all()
     return items
 
-@router.post("/buy-item/{item_id}")
+@router.post("/buy-item{item_id}")
 async def buy_item(item_id: int, db: Session = Depends(get_db), Authorize: AuthJWT = Depends()):
     Authorize.jwt_required()
     user_id = Authorize.get_jwt_subject()

@@ -17,7 +17,7 @@ class Location(BaseModel):
 
 
 # int = 1000 -> 1km 
-@router.post("/maps/nearby-hospitals/")
+@router.post("/nearby-hospitals")
 async def nearby_hospitals(location: Location = Depends(), radius: int = 1000):
     """
     # 디폴트 값으로 SKT 보라매사옥으로 설정해놨음
@@ -42,7 +42,7 @@ async def nearby_hospitals(location: Location = Depends(), radius: int = 1000):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.post("/maps/directions/")
+@router.post("/directions")
 async def get_directions(origin: Location = Depends(), destination: Location = Depends()):
     """
     사용자 현재 위치를 가져와서 목적지까지 길안내 Google api

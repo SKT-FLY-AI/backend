@@ -25,7 +25,9 @@ class Image(Base):
     file_name = Column(String(100), nullable=False)
     poo_type = Column(Integer, nullable=False, default=0)
     poo_color = Column(String(50), nullable=False, default='#685960')  # 여기에 기본값 설정
-    
+    poo_blood = Column(Integer, nullable=False, default=0)  # TINYINT(1)로 설정
+
+
 
 
     user = relationship("User", back_populates="images")

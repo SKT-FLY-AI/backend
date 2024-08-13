@@ -7,6 +7,7 @@ from fastapi_jwt_auth.exceptions import AuthJWTException
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from pydantic import BaseModel
 import image
+import bcrypt
 import register
 import chatgpt
 from database import init_db, get_db
@@ -81,8 +82,10 @@ def protected_route(Authorize: AuthJWT = Depends()):
     
     return {"message": "You are authenticated", "user_id": Authorize.get_jwt_subject()}
 
+
+
 # tmap 이동경로
-@app.get("/hometime/")
+@app.get("/hometime")
 async def hometime(start: str, end: str):
     """
     # tmap api쓴건데 구글맵이 더 편함 ㅎ.. 아직 사용 x

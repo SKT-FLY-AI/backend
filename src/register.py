@@ -9,6 +9,7 @@ from schemas import UserCreate, UserLogin, UserUpdate
 from pydantic import BaseSettings
 from typing import List
 from fastapi.security import OAuth2PasswordBearer
+import requests
 
 
 router = APIRouter()
@@ -62,12 +63,18 @@ async def login(
 
 
 @router.get("/users", response_model=List[UserCreate])
-async def read_users(skip: int = 0, limit: int = 10, db: Session = Depends(get_db), Authorize: AuthJWT = Depends()):
-    Authorize.jwt_required()
+async def read_users(request: Request, skip: int = 0, limit: int = 10, db: Session = Depends(get_db)):
+    # 세션에서 사용자 ID를 가져오기
+    user_id = request.session.get("user_id")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="User not logged in")
+
     users = db.query(User).offset(skip).limit(limit).all()
     return users
 
-@router.get("/users/{user_id}", response_model=UserCreate)
+
+
+@router.get("/{user_id}", response_model=UserCreate)
 async def read_user(user_id: int, db: Session = Depends(get_db), Authorize: AuthJWT = Depends()):
     Authorize.jwt_required()
     user = db.query(User).filter(User.id == user_id).first()
@@ -75,7 +82,7 @@ async def read_user(user_id: int, db: Session = Depends(get_db), Authorize: Auth
         raise HTTPException(status_code=404, detail="User not found")
     return user
 
-@router.put("/users/{user_id}")
+@router.put("/{user_id}")
 async def update_user(user_id: int, user_update: UserUpdate, db: Session = Depends(get_db), Authorize: AuthJWT = Depends()):
     Authorize.jwt_required()
     user = db.query(User).filter(User.id == user_id).first()
@@ -88,7 +95,7 @@ async def update_user(user_id: int, user_update: UserUpdate, db: Session = Depen
     db.refresh(user)
     return user
 
-@router.delete("/users/{user_id}")
+@router.delete("/{user_id}")
 async def delete_user(user_id: int, db: Session = Depends(get_db), Authorize: AuthJWT = Depends()):
     Authorize.jwt_required()
     user = db.query(User).filter(User.id == user_id).first()
@@ -102,7 +109,7 @@ async def delete_user(user_id: int, db: Session = Depends(get_db), Authorize: Au
 
 # 포인트 추가 엔드포인트부분 수정금지
 
-@router.post("/users/{user_id}/add_points")
+@router.post("/add_points/{user_id}")
 async def add_points(user_id: int, points: int, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.id == user_id).first()
     if user is None:
@@ -114,7 +121,7 @@ async def add_points(user_id: int, points: int, db: Session = Depends(get_db)):
     return {"message": f"{points} points added to user {user_id}", "new_points_balance": user.points}
 
 
-@router.get("/users/{user_id}/points")
+@router.get("/points/{user_id}")
 async def get_points(user_id: int, db: Session = Depends(get_db)):
     # JWT 검증을 제거하고 바로 데이터베이스에서 유저의 포인트를 불러옴
     user = db.query(User).filter(User.id == user_id).first()
