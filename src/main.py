@@ -6,23 +6,23 @@ from fastapi_jwt_auth import AuthJWT
 from fastapi_jwt_auth.exceptions import AuthJWTException
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from pydantic import BaseModel
-import image
-import bcrypt
-import register
-import chatgpt
+import image, bcrypt,register
+import chatgpt,tmap, os, googlemap
 from database import init_db, get_db
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session 
 from models import User  
 from passlib.context import CryptContext
-from store import router as store_router
-import googlemap  # googlemap 모듈 참조
-import tmap
+from cardnews import router as cardnews_router
+from poopt import router as poopt_router
+
+
+
 
 app = FastAPI()
 router = APIRouter()
 
 # 똥바타 전용
-app.include_router(store_router, prefix="/store")
+# app.include_router(store_router, prefix="/store")
 
 # 미들웨어 설정
 app.add_middleware(SessionMiddleware, secret_key="0nVpRh2JmUnz9X4G5k3JmZ6Vb2LqTsXe")
@@ -48,7 +48,9 @@ origins = [
     "http://127.0.0.1:8000",
     "http://127.0.0.1:5500",
     "http://0.0.0.1:8000",
-    "http://223.194.44.32:8000"
+    "http://223.194.44.32:8000",
+    "http://223.194.44.32:8080"
+
 ]
 
 app.add_middleware(
@@ -68,6 +70,12 @@ app.include_router(register.router, prefix="/users", tags=["users"])
 app.include_router(image.router, prefix="/images", tags=["images"])
 app.include_router(chatgpt.router, prefix="/chatgpt", tags=["ChatGpt"])
 app.include_router(googlemap.router, prefix="/maps", tags=["maps"])  # googlemap 라우터 추가
+# app.include_router(store.router, prefix="/maps", tags=["maps"]) 
+app.include_router(cardnews_router, prefix="/cardnews", tags=["cardnews"])
+app.include_router(poopt_router, prefix="/chatgpt", tags=["ChatGpt"])
+
+
+
 
 @app.get("/")
 async def read_root():
@@ -95,3 +103,7 @@ async def hometime(start: str, end: str):
     end_poi = tmap.get_poi_by_keyword(end)
     total_time = tmap.get_total_time(start_poi, end_poi)
     return {"result": total_time}
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=int(os.getenv("PORT", 8000)))

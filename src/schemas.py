@@ -9,7 +9,7 @@ class UserCreate(BaseModel):
     username: str
     email: str
     password: str
-    sex : int
+    usersex : int
 
 class UserLogin(BaseModel):
     username: str
@@ -58,3 +58,8 @@ class UserItem(BaseModel):
 
     class Config:
         orm_mode = True
+
+class ChatRequest(BaseModel):
+    poo_type: str
+    poo_color: str
+    poo_blood: str

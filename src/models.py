@@ -1,7 +1,6 @@
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey
 from sqlalchemy.orm import relationship
 from database import Base
-
 class User(Base):
     __tablename__ = "users"
 
@@ -12,7 +11,7 @@ class User(Base):
     points = Column(Integer, default=0)                                      # 포인트 필드 추가, 기본값 0
     images = relationship("Image", back_populates="user")
     items = relationship("UserItem", back_populates="user")  # UserItem 관계 추가
-    sex = Column(Integer, default=0)                                      # 쎆쓰 필드 추가, 기본값 0 : 남자/1 : 여자
+    usersex = Column(Integer, default=0)                                      # 쎆쓰 필드 추가, 기본값 0 : 남자/1 : 여자
 
 
 class Image(Base):
@@ -49,3 +48,14 @@ class Item(Base):
     name = Column(String(100), index=True)  # 길이 100 지정
     description = Column(String(255))  # 길이 255 지정
     price = Column(Integer)
+
+
+class Analyze(Base):
+    __tablename__ = "analyze"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
+    poo_type = Column(Integer, nullable=False, default=0)
+    poo_color = Column(String(50), nullable=False) #default='#685960')  # 기본값이 설정되어있음.
+    poo_blood = Column(Integer, nullable=False, default=0)  # TINYINT(1)로 설정
+    analysis_time = Column(DateTime, nullable=False)  # 분석 시간 추가

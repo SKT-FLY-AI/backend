@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
 import os
 import shutil
+from pydantic import BaseModel
 from database import get_db 
 from models import Image, User
 from schemas import ImageResponse
@@ -14,10 +15,8 @@ import register
 from analyze import analyze_image
 from pydantic import BaseModel
 import json
-import aiohttp # 필요없을듯?
-
-
-
+import httpx
+import poopt
 
 router = APIRouter()
 
@@ -25,85 +24,56 @@ class ImageData(BaseModel):
     image_name: str
     user_id: int
 
-# ai 서버에 보내는거 미포함
-"""
-# 이미지 업로드 엔드포인트
-@router.post("/upload", response_model=ImageResponse)
-async def upload_image(
-    request: Request,  # FastAPI의 Request 객체를 통해 세션 또는 쿠키 접근 가능
-    file: UploadFile = File(...), 
-    db: Session = Depends(get_db)
-):
+class ImageResponse(BaseModel):
+    id: int
+    user_id: int
+    file_path: str
+    upload_time: datetime
+    file_name: str
+    poo_type: int
+    poo_color: str
+    poo_blood: int
+    points: int
+
+    class Config:
+        orm_mode = True
+
+async def call_poopt_endpoint(user_id: int, db: Session):
+    url = f"http://223.194.44.32:8000/chatgpt/poopt"
     try:
-        # 세션에서 사용자 ID 가져오기 (예시)
-        user_id = request.session.get("user_id")
-        if not user_id:
-            raise HTTPException(status_code=401, detail="User not logged in")
-
-        # 사용자 정보 확인
-        user = db.query(User).filter(User.id == user_id).first()
-        if not user:
-            raise HTTPException(status_code=404, detail="User not found")
-
-        # 사용자별 파일 업로드 디렉토리 설정
-        upload_dir = os.path.join("uploads", str(user_id))
-        if not os.path.exists(upload_dir):
-            try:
-                os.makedirs(upload_dir, exist_ok=True)
-            except Exception as e:
-                raise HTTPException(status_code=500, detail=f"Failed to create directory: {str(e)}")
-
-        # 안전한 파일 이름 생성
-        safe_filename = secure_filename(file.filename)
-        if not safe_filename:
-            raise HTTPException(status_code=400, detail="Invalid file name")
-
-        # 파일 저장 경로 설정
-        file_path = os.path.join(upload_dir, safe_filename)
-        try:
-            with open(file_path, "wb") as buffer:
-                shutil.copyfileobj(file.file, buffer)
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Failed to save file: {str(e)}")
-
-        # 데이터베이스에 이미지 정보 저장
-        new_image = Image(
-            user_id=user.id, 
-            file_path=file_path, 
-            upload_time=datetime.now(),
-            file_name=safe_filename
+        async with httpx.AsyncClient() as client:
+            response = await client.post(url, params={"user_id": user_id})
+            response.raise_for_status()  # HTTP 에러가 있는 경우 예외 발생
+            return response.text
+    except httpx.HTTPStatusError as e:
+        print(f"HTTP error calling {url}: {e.response.status_code} - {e.response.text}")
+        raise HTTPException(
+            status_code=500, 
+            detail=f"Error calling /poopt: {e.response.status_code} - {e.response.text}"
         )
-        try:
-            db.add(new_image)
-            db.commit()
-            db.refresh(new_image)
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Failed to save image to the database: {str(e)}")
-
-        # 이미지 URL 생성
-        image_url = f"http://223.194.44.32:8000/uploads/{user_id}/{safe_filename}"
-
-        return {
-            "id": new_image.id,
-            "user_id": new_image.user_id,
-            "file_path": image_url,
-            "upload_time": new_image.upload_time,
-            "file_name": safe_filename,
-            "points": user.points  # 현재 포인트 반환
-        }
+    except httpx.RequestError as e:
+        # 네트워크 에러 등 요청 중 발생할 수 있는 일반적인 예외 처리
+        print(f"Request error while calling {url}: {str(e)}")
+        raise HTTPException(
+            status_code=500, 
+            detail=f"Request error calling /poopt: {str(e)}"
+        )
     except Exception as e:
-        error_trace = traceback.format_exc()
-        print(f"Error during image upload: {e}\n{error_trace}")  # 에러 추적 정보 출력
-        raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
-"""
+        # 기타 예상치 못한 예외 처리
+        print(f"Unexpected error calling {url}: {str(e)}")
+        raise HTTPException(
+            status_code=500, 
+            detail=f"Unexpected error calling /poopt: {str(e)}"
+        )
+
 
 
 #ai 서버 포함  
 # 이미지 업로드 엔드포인트
 @router.post("/upload", response_model=ImageResponse)
 async def upload_image(
-    request: Request,  # FastAPI의 Request 객체를 통해 세션 또는 쿠키 접근 가능
-    file: UploadFile = File(...), 
+    request: Request,
+    file: UploadFile = File(...),
     db: Session = Depends(get_db)
 ):
     try:
@@ -123,16 +93,15 @@ async def upload_image(
             raise HTTPException(status_code=400, detail="Invalid file name")
 
         # 이미지 분석 요청
-        # AI 서버에 파일 객체를 바로 보내기 (file_path 대신 파일 객체를 전송)
         analysis_result = analyze_image(file)  # AI 서버로 이미지 파일 객체를 전달하여 분석 요청
         poo_type = analysis_result['poo_type']
         poo_color = analysis_result['poo_color']
-        poo_blood = analysis_result['poo_isBlood']
+        poo_blood = analysis_result['poo_blood']
 
         # 데이터베이스에 이미지 정보 저장
         new_image = Image(
             user_id=user.id,
-            file_path=safe_filename,  # URL이 아닌 파일 이름만 저장
+            file_path=safe_filename,
             upload_time=datetime.now(),
             file_name=safe_filename,
             poo_type=poo_type,
@@ -146,6 +115,10 @@ async def upload_image(
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Failed to save image to the database: {str(e)}")
 
+        # poo_blood가 1이면 /poopt 엔드포인트 호출
+        if poo_blood == 1:
+            await call_poopt_endpoint(user_id=user.id, db=db)
+
         return {
             "id": new_image.id,
             "user_id": new_image.user_id,
@@ -155,20 +128,12 @@ async def upload_image(
             "poo_type": new_image.poo_type,
             "poo_color": new_image.poo_color,
             "poo_blood": new_image.poo_blood,
-            "points": user.points  # 현재 포인트 반환
+            "points": user.points
         }
     except Exception as e:
         error_trace = traceback.format_exc()
-        print(f"Error during image upload: {e}\n{error_trace}")  # 에러 추적 정보 출력
+        print(f"Error during image upload: {e}\n{error_trace}")
         raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
-
-
-
-
-
-
-
-
 
 # 날짜별 이미지 조회 엔드포인트
 @router.get("/{date}", response_model=List[ImageResponse])

@@ -12,3 +12,8 @@ def analyze_image(file):
         return response.json()  # 분석 결과를 JSON으로 반환
     else:
         raise Exception(f"Failed to analyze image: {response.status_code}, {response.text}")
+
+
+
+
+

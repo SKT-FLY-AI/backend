@@ -3,6 +3,9 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from fastapi.responses import StreamingResponse
 import asyncio
+from dotenv import load_dotenv
+
+load_dotenv()
 
 router = APIRouter()
 
