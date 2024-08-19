@@ -1,4 +1,4 @@
-fastapi==0.112.0
+fastapi==0.100.0
 sqlalchemy==2.0.32
 uvicorn == 0.30.5
 passlib==1.7.4
@@ -15,7 +15,7 @@ attrs == 23.1.0
 itsdangerous==2.2.0
 bcrypt == 4.2.0
 wget == 3.2
-pydantic==1.10.7
+pydantic==1.10.12
 python_dotenv==1.0.1
 googlemaps==4.10.0
 passlib==1.7.4

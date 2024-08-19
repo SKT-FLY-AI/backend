@@ -4,7 +4,6 @@ from fastapi import APIRouter, HTTPException
 router = APIRouter()
 
 
-# settings.py (예시)
 GOOGLE_API_KEY = "AIzaSyAUrHGKxUv4uolLpQeYaeoduMS0oCCC_kE"
 SEARCH_ENGINE_ID = "424e29605a7c34b85"
 

@@ -4,7 +4,7 @@ from passlib.context import CryptContext
 from fastapi_jwt_auth import AuthJWT
 from database import get_db
 import bcrypt
-from models import User
+from models import User, Image
 from schemas import UserCreate, UserLogin, UserUpdate
 from pydantic import BaseSettings
 from typing import List
@@ -47,17 +47,30 @@ async def signup(signup_data: UserCreate, db: Session = Depends(get_db)):
 
 @router.post("/login")
 async def login(
-    request: Request,  # Request 인자를 가장 앞으로 이동
+    request: Request, 
     signin_data: UserLogin,
     Authorize: AuthJWT = Depends(),
     db: Session = Depends(get_db)
 ):
-    user = db.query(User).filter(User.username == signin_data.username).first()
+    # 이메일로 사용자 조회
+    user = db.query(User).filter(User.email == signin_data.email).first()
 
     if user and verify_password(signin_data.password, user.hashed_password):
         access_token = Authorize.create_access_token(subject=str(user.id))  # 사용자 ID를 JWT의 subject로 설정
         request.session['user_id'] = user.id  # 로그인한 사용자 ID를 세션에 저장
-        return {"message": "Login successful", "access_token": access_token,"user_id":user.id}
+        
+        # 사용자가 업로드한 모든 이미지를 조회
+        images = db.query(Image).filter(Image.user_id == user.id).all()
+
+        # 이미지가 없으면 빈 리스트 반환
+        image_responses = images if images else []
+
+        return {
+            "message": "Login successful",
+            "access_token": access_token,
+            "user_id": user.id,
+            "images": image_responses  # 이미지 데이터 추가
+        }
     else:
         raise HTTPException(status_code=401, detail="Invalid credentials")
 

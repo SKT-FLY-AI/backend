@@ -1,6 +1,9 @@
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text, Enum
 from sqlalchemy.orm import relationship
 from database import Base
+from datetime import datetime
+
+
 class User(Base):
     __tablename__ = "users"
 
@@ -13,6 +16,7 @@ class User(Base):
     items = relationship("UserItem", back_populates="user")  # UserItem 관계 추가
     usersex = Column(Integer, default=0)                                      # 쎆쓰 필드 추가, 기본값 0 : 남자/1 : 여자
 
+    chat_logs = relationship("ChatLog", back_populates="user", cascade="all, delete-orphan")
 
 class Image(Base):
     __tablename__ = "images"
@@ -25,6 +29,8 @@ class Image(Base):
     poo_type = Column(Integer, nullable=False, default=0)
     poo_color = Column(String(50), nullable=False, default='#685960')  # 여기에 기본값 설정
     poo_blood = Column(Integer, nullable=False, default=0)  # TINYINT(1)로 설정
+    usersex = Column(Integer)  
+    doubt = Column(String(100))  
 
 
 
@@ -59,3 +65,22 @@ class Analyze(Base):
     poo_color = Column(String(50), nullable=False) #default='#685960')  # 기본값이 설정되어있음.
     poo_blood = Column(Integer, nullable=False, default=0)  # TINYINT(1)로 설정
     analysis_time = Column(DateTime, nullable=False)  # 분석 시간 추가
+
+
+
+class ChatLog(Base):
+    __tablename__ = "chat_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
+    role = Column(Enum('user', 'assistant'), nullable=False)
+    message = Column(Text, nullable=False)
+    timestamp = Column(DateTime, default=datetime.utcnow) 
+    image_id = Column(Integer, ForeignKey('images.id'), nullable=True)  # 이미지 ID 추가
+    poo_color = Column(String(50), nullable=True)  # poo_color 필드 추가
+    poo_type = Column(Integer, nullable=True)  # poo_type 필드 추가
+    poo_blood = Column(Integer, nullable=True)  # poo_blood 필드 추가
+
+
+    user = relationship("User", back_populates="chat_logs")
+    image = relationship("Image")  # 이미지를 참조하는 관계 추가

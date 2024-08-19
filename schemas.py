@@ -12,7 +12,7 @@ class UserCreate(BaseModel):
     usersex : int
 
 class UserLogin(BaseModel):
-    username: str
+    email: str
     password: str
 
 class UserUpdate(BaseModel):
@@ -27,10 +27,27 @@ class ImageResponse(BaseModel):
     user_id: int
     file_path: str
     upload_time: datetime
-    file_name: str  # 파일 이름 필드 추가
-    poo_type: int  # 추가: poo_type 필드
-    poo_color: str  # 추가: poo_color 필드
-    poo_blood: bool  # 추가: poo_blood 필드
+    file_name: str 
+    poo_type: int  
+    poo_color: str 
+    poo_blood: int 
+    usersex: int  
+    doubt: str
+
+    class Config:
+        orm_mode = True
+
+# 조회전용
+class ImageResponseWithoutPoints(BaseModel):
+    id: int
+    user_id: int
+    file_path: str
+    upload_time: datetime
+    file_name: str
+    poo_type: int
+    poo_color: str
+    poo_blood: int
+    usersex: int  # usersex 필드 추가
 
     class Config:
         orm_mode = True
@@ -59,7 +76,24 @@ class UserItem(BaseModel):
     class Config:
         orm_mode = True
 
+
+# Chat log
 class ChatRequest(BaseModel):
     poo_type: str
     poo_color: str
     poo_blood: str
+
+
+class ChatLogResponse(BaseModel):
+    id: int
+    user_id: int
+    role: str
+    message: str
+    timestamp: datetime
+    image_id: int = None
+    poo_color: str = None
+    poo_type: int = None
+    poo_blood: int = None
+
+    class Config:
+        orm_mode = True

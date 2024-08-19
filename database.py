@@ -14,7 +14,7 @@ SSH_PASSWORD = "9405654"
 DB_USER = "admin"
 DB_PASSWORD = "Gkswotjr123!"
 DB_HOST = "127.0.0.1"
-DB_PORT = 3306  # MySQL 기본 포트
+DB_PORT = 8000  # MySQL 기본 포트
 DB_NAME = "maindb"
 
 # SSH 터널링 설정
@@ -31,10 +31,10 @@ server.start()
 DATABASE_URL = f"mysql+pymysql://{DB_USER}:{DB_PASSWORD}@223.194.44.32:{server.local_bind_port}/{DB_NAME}"
 
 # Engine
-engine = create_engine(DATABASE_URL)
+engine = create_engine(f"mysql+pymysql://{DB_USER}:{DB_PASSWORD}@223.194.44.32:3306/{DB_NAME}?connect_timeout=20")
 
 # Session local
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine, expire_on_commit=False)
 
 # Base
 Base = declarative_base()

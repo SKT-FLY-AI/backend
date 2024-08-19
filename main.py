@@ -14,6 +14,8 @@ from models import User
 from passlib.context import CryptContext
 from cardnews import router as cardnews_router
 from poopt import router as poopt_router
+from map import router as map_router
+
 
 
 
@@ -46,7 +48,8 @@ origins = [
     "http://localhost",
     "http://localhost:8000",
     "http://127.0.0.1:8000",
-    "http://127.0.0.1:5500",
+    "http://127.0.0.1:8080",
+    "http://localhost:8080",
     "http://0.0.0.1:8000",
     "http://223.194.44.32:8000",
     "http://223.194.44.32:8080"
@@ -73,6 +76,8 @@ app.include_router(googlemap.router, prefix="/maps", tags=["maps"])  # googlemap
 # app.include_router(store.router, prefix="/maps", tags=["maps"]) 
 app.include_router(cardnews_router, prefix="/cardnews", tags=["cardnews"])
 app.include_router(poopt_router, prefix="/chatgpt", tags=["ChatGpt"])
+app.include_router(map_router, prefix="/map", tags=["maps"])
+
 
 
 
@@ -93,17 +98,12 @@ def protected_route(Authorize: AuthJWT = Depends()):
 
 
 
-# tmap 이동경로
 @app.get("/hometime")
 async def hometime(start: str, end: str):
-    """
-    # tmap api쓴건데 구글맵이 더 편함 ㅎ.. 아직 사용 x
-    """
-    start_poi = tmap.get_poi_by_keyword(start)
-    end_poi = tmap.get_poi_by_keyword(end)
-    total_time = tmap.get_total_time(start_poi, end_poi)
-    return {"result": total_time}
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=int(os.getenv("PORT", 8000)))
+    try:
+        start_poi = tmap.get_poi_by_keyword(start)
+        end_poi = tmap.get_poi_by_keyword(end)
+        total_time = tmap.get_total_time(start_poi, end_poi)
+        return {"result": total_time}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
