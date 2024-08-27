@@ -1,12 +1,16 @@
+import os
 import requests
 from fastapi import APIRouter, HTTPException
+from dotenv import load_dotenv
 
 router = APIRouter()
 
+# .env 파일에서 환경 변수 로드
+load_dotenv()
 
-GOOGLE_API_KEY = "AIzaSyAUrHGKxUv4uolLpQeYaeoduMS0oCCC_kE"
-SEARCH_ENGINE_ID = "424e29605a7c34b85"
-
+# 환경 변수에서 Google API Key와 Search Engine ID 가져오기
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+SEARCH_ENGINE_ID = os.getenv("SEARCH_ENGINE_ID")
 
 @router.get("/cardnews")
 async def get_card_news(query: str):
@@ -37,4 +41,3 @@ async def get_card_news(query: str):
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-

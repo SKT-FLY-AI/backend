@@ -20,3 +20,6 @@ python_dotenv==1.0.1
 googlemaps==4.10.0
 passlib==1.7.4
 httpx==0.23.0
+authlib
+pyjwt
+anyio

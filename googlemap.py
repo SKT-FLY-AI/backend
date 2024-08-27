@@ -1,20 +1,24 @@
+import os
 from fastapi import FastAPI, Depends, HTTPException, APIRouter
 from pydantic import BaseModel, Field
 import googlemaps
+from dotenv import load_dotenv
+
+# .env 파일에서 환경 변수를 로드
+load_dotenv()
 
 router = APIRouter()
 
+# .env 파일에서 API 키를 가져오기
+google_maps_api_key = os.getenv("GOOGLE_MAPS_API_KEY")
 
-# Google Maps API Key
-GOOGLE_MAPS_API_KEY = "AIzaSyAUrHGKxUv4uolLpQeYaeoduMS0oCCC_kE"
-gmaps = googlemaps.Client(key=GOOGLE_MAPS_API_KEY)
+# Google Maps 클라이언트 초기화
+gmaps = googlemaps.Client(key=google_maps_api_key)
 
 # 기본위치 정의
 class Location(BaseModel):
     latitude: float = Field(37.49202451946862, description="위도 (기본값: 37.49202451946862)")
     longitude: float = Field(126.92630733625505, description="경도 (기본값: 126.92630733625505)")
-
-
 
 # int = 1000 -> 1km 
 @router.post("/nearby-hospitals")

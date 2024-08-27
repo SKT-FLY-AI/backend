@@ -4,18 +4,21 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.orm import Session
 from sshtunnel import SSHTunnelForwarder
 import pymysql
+from dotenv import load_dotenv
+import os
 
-# SSH and database configuration
-SSH_HOST = "223.194.44.32"
-SSH_PORT = 3391
-SSH_USER = "npswml"
-SSH_PASSWORD = "9405654"
+load_dotenv()
 
-DB_USER = "admin"
-DB_PASSWORD = "Gkswotjr123!"
-DB_HOST = "127.0.0.1"
-DB_PORT = 8000  # MySQL 기본 포트
-DB_NAME = "maindb"
+SSH_HOST = os.getenv("SSH_HOST")
+SSH_PORT = int(os.getenv("SSH_PORT"))
+SSH_USER = os.getenv("SSH_USER")
+SSH_PASSWORD = os.getenv("SSH_PASSWORD")
+
+DB_USER = os.getenv("DB_USER")
+DB_PASSWORD = os.getenv("DB_PASSWORD")
+DB_HOST = os.getenv("DB_HOST")
+DB_PORT = int(os.getenv("DB_PORT"))
+DB_NAME = os.getenv("DB_NAME")
 
 # SSH 터널링 설정
 server = SSHTunnelForwarder(

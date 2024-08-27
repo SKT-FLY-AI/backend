@@ -1,7 +1,16 @@
+import os
 import requests
+from dotenv import load_dotenv
+
+# .env 파일에서 환경 변수 로드
+load_dotenv()
 
 def analyze_image(file):
-    ai_server_url = "http://223.194.44.78:8000/analysis"  # AI 서버의 엔드포인트
+    # 환경 변수에서 AI 서버 URL 가져오기
+    ai_server_url = os.getenv("AI_SERVER_URL")
+    
+    if not ai_server_url:
+        raise Exception("AI_SERVER_URL is not set in the environment variables.")
 
     # 파일 객체를 전송
     files = {'file': (file.filename, file.file, file.content_type)}
@@ -12,8 +21,6 @@ def analyze_image(file):
         return response.json()  # 분석 결과를 JSON으로 반환
     else:
         raise Exception(f"Failed to analyze image: {response.status_code}, {response.text}")
-
-
 
 
 

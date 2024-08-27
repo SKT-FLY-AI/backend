@@ -6,8 +6,8 @@ from fastapi_jwt_auth import AuthJWT
 from fastapi_jwt_auth.exceptions import AuthJWTException
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from pydantic import BaseModel
-import image, bcrypt,register
-import chatgpt,tmap, os, googlemap
+import image, bcrypt, register
+import chatgpt, tmap, os, googlemap
 from database import init_db, get_db
 from sqlalchemy.orm import Session 
 from models import User  
@@ -15,30 +15,29 @@ from passlib.context import CryptContext
 from cardnews import router as cardnews_router
 from poopt import router as poopt_router
 from map import router as map_router
+from register import router as kakao_router
+from dotenv import load_dotenv
 
-
-
-
+# Load environment variables
+load_dotenv()
 
 app = FastAPI()
 router = APIRouter()
 
-# 똥바타 전용
-# app.include_router(store_router, prefix="/store")
+# Secret key loaded from environment variable
+session_secret_key = os.getenv("SESSION_SECRET_KEY")
+jwt_secret_key = os.getenv("AUTHJWT_SECRET_KEY")
 
-# 미들웨어 설정
-app.add_middleware(SessionMiddleware, secret_key="0nVpRh2JmUnz9X4G5k3JmZ6Vb2LqTsXe")
+# Apply session middleware
+app.add_middleware(SessionMiddleware, secret_key=session_secret_key)
 
-
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/token")
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 class Token(BaseModel):
     access_token: str
     token_type: str
 
 class Settings(BaseModel):
-    authjwt_secret_key: str = "0nVpRh2JmUnz9X4G5k3JmZ6Vb2LqTsXe"
+    authjwt_secret_key: str = jwt_secret_key
 
 @AuthJWT.load_config
 def get_config():
@@ -51,42 +50,32 @@ origins = [
     "http://127.0.0.1:8080",
     "http://localhost:8080",
     "http://0.0.0.1:8000",
-    "http://223.194.44.32:8000",
-    "http://223.194.44.32:8080"
-
 ]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"],  # 모든 도메인에서의 접근을 허용. 필요에 따라 특정 도메인으로 제한 가능
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["*"],  # 모든 HTTP 메서드 허용
+    allow_headers=["*"],  # 모든 헤더 허용
 )
-
-app.add_middleware(SessionMiddleware, secret_key="0nVpRh2JmUnz9X4G5k3JmZ6Vb2LqTsXe")
-app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 init_db()
 
 app.include_router(register.router, prefix="/users", tags=["users"])
 app.include_router(image.router, prefix="/images", tags=["images"])
 app.include_router(chatgpt.router, prefix="/chatgpt", tags=["ChatGpt"])
-app.include_router(googlemap.router, prefix="/maps", tags=["maps"])  # googlemap 라우터 추가
-# app.include_router(store.router, prefix="/maps", tags=["maps"]) 
+app.include_router(googlemap.router, prefix="/maps", tags=["maps"])
 app.include_router(cardnews_router, prefix="/cardnews", tags=["cardnews"])
 app.include_router(poopt_router, prefix="/chatgpt", tags=["ChatGpt"])
 app.include_router(map_router, prefix="/map", tags=["maps"])
-
-
-
-
+app.include_router(kakao_router, prefix="/users", tags=["users"])
 
 @app.get("/")
 async def read_root():
     return {"message": "Welcome to the FastAPI application"}
 
-# JWT 보호된 엔드포인트
+# JWT protected endpoint
 @app.get("/protected")
 def protected_route(Authorize: AuthJWT = Depends()):
     try:
@@ -95,8 +84,6 @@ def protected_route(Authorize: AuthJWT = Depends()):
         raise HTTPException(status_code=401, detail=str(e))
     
     return {"message": "You are authenticated", "user_id": Authorize.get_jwt_subject()}
-
-
 
 @app.get("/hometime")
 async def hometime(start: str, end: str):
