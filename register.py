@@ -47,91 +47,8 @@ app.add_middleware(
 app.add_middleware(SessionMiddleware, secret_key=os.getenv("0nVpRh2JmUnz9X4G5k3JmZ6Vb2LqTsXe"))
 
 
-# 카카오 OAuth 환경 변수 설정
-KAKAO_CLIENT_ID = os.getenv("KAKAO_CLIENT_ID")
-KAKAO_CLIENT_SECRET = os.getenv("KAKAO_CLIENT_SECRET")
-
 # OAuth 설정
 oauth = OAuth()
-
-oauth.register(
-    name='kakao',
-    client_id=KAKAO_CLIENT_ID,
-    client_secret=KAKAO_CLIENT_SECRET,
-    authorize_url="https://kauth.kakao.com/oauth/authorize",
-    authorize_params=None,
-    access_token_url="https://kauth.kakao.com/oauth/token",
-    access_token_params=None,
-    refresh_token_url=None,
-    redirect_uri="http://localhost:8000/users/auth/kakao/callback",  # Redirect URL 설정
-    client_kwargs={'scope': 'profile_nickname, account_email'}
-)
-
-
-
-
-
-
-# Google OAuth 환경 변수 설정
-GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
-GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
-GOOGLE_DISCOVERY_URL = "https://accounts.google.com/.well-known/openid-configuration"
-
-# OAuth 설정
-oauth = OAuth()
-
-oauth.register(
-    name='google',
-    client_id=GOOGLE_CLIENT_ID,
-    client_secret=GOOGLE_CLIENT_SECRET,
-    server_metadata_url=GOOGLE_DISCOVERY_URL,
-    client_kwargs={'scope': 'openid email profile'}
-)
-
-
-# 카카오 로그인 엔드포인트 추가
-@router.get("/login/kakao")
-async def kakao_login(request: Request):
-    redirect_uri = request.url_for('kakao_callback')
-    return await oauth.kakao.authorize_redirect(request, redirect_uri)
-
-# 카카오 로그인 콜백 엔드포인트 추가
-@router.get("/auth/kakao/callback")
-async def kakao_callback(request: Request, db: Session = Depends(get_db), Authorize: AuthJWT = Depends()):
-    token = await oauth.kakao.authorize_access_token(request)
-    user_info = await oauth.kakao.parse_id_token(request, token)
-
-    kakao_account = user_info.get("kakao_account")
-    profile = kakao_account.get("profile")
-
-    # 이메일로 사용자 검색
-    user = db.query(User).filter(User.email == kakao_account.get("email")).first()
-
-    # 새로운 사용자면 회원가입 처리
-    if not user:
-        user = User(
-            username=profile.get("nickname"),
-            email=kakao_account.get("email"),
-            hashed_password="",  # 소셜 로그인 사용자는 비밀번호가 필요하지 않습니다.
-            usersex=0  # 기본값으로 설정하거나 사용자에게 선택받도록 구현할 수 있습니다.
-        )
-        db.add(user)
-        db.commit()
-        db.refresh(user)
-
-    # JWT 토큰 생성 및 반환
-    access_token = Authorize.create_access_token(subject=str(user.id))
-    request.session['user_id'] = user.id  # 로그인한 사용자 ID를 세션에 저장
-    
-    # 사용자가 업로드한 모든 이미지를 조회
-    images = db.query(Image).filter(Image.user_id == user.id).all()
-
-    return {
-        "message": "Login successful via Kakao",
-        "access_token": access_token,
-        "user_id": user.id,
-        "images": images  # 이미지 데이터 추가
-    }
 
 
 # 기존 설정
@@ -236,7 +153,7 @@ async def login(signin_data: UserLogin, db: Session = Depends(get_db)):
                 "file_name": image.file_name,
                 "poo_type": image.poo_type,
                 "poo_color": image.poo_color,
-                "poo_blood": image.poo_blood,
+                # "poo_blood": image.poo_blood,
             }
         else:
             image_data = None
@@ -262,7 +179,9 @@ async def create_user(user: UserCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(new_user)
     
+    # UserResponse에 user_id를 포함하여 반환
     return UserResponse(
+        user_id=new_user.id,
         email=new_user.email,
         dog_info=None  # 초기에는 개 정보가 없으므로 None
     )
@@ -318,23 +237,3 @@ async def delete_user(user_id: int, db: Session = Depends(get_db)):
 app.include_router(router)
 
 # 포인트 추가 엔드포인트부분 수정금지
-
-@router.post("/add_points/{user_id}")
-async def add_points(user_id: int, points: int, db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.id == user_id).first()
-    if user is None:
-        raise HTTPException(status_code=404, detail="User not found")
-
-    # 포인트 추가
-    user.points += points
-    db.commit()
-    return {"message": f"{points} points added to user {user_id}", "new_points_balance": user.points}
-
-
-@router.get("/points/{user_id}")
-async def get_points(user_id: int, db: Session = Depends(get_db)):
-    # JWT 검증을 제거하고 바로 데이터베이스에서 유저의 포인트를 불러옴
-    user = db.query(User).filter(User.id == user_id).first()
-    if user is None:
-        raise HTTPException(status_code=404, detail="User not found")
-    return {"user_id": user_id, "points": user.points}

@@ -15,6 +15,7 @@ from analyze import analyze_image
 from dotenv import load_dotenv
 import register
 from fastapi.middleware.cors import CORSMiddleware
+import json
 
 
 
@@ -41,7 +42,7 @@ class ImageData(BaseModel):
     image_name: str
     user_id: int
 
-async def call_poopt_endpoint(user_id: int, db: Session, image_id: int, poo_type: int, poo_color: str, poo_blood: int):
+async def call_poopt_endpoint(user_id: int, db: Session, image_id: int, poo_type: str, poo_color: str, poo_blood: int):
     url = f"{AI_SERVER_URL}/chatgpt/poopt"
     try:
         async with httpx.AsyncClient() as client:
@@ -227,8 +228,6 @@ def get_logged_in_user_id(session: dict) -> int:
     if not user_id:
         raise HTTPException(status_code=401, detail="User not logged in")
     return user_id
-
-
 @router.post("/upload")
 async def upload_image(
     user_id: int = Form(...),  # user_id를 Form 데이터로 받습니다.
@@ -251,9 +250,8 @@ async def upload_image(
 
         # 이미지 분석 요청
         analysis_result = analyze_image(file)
-        poo_type = analysis_result['poo_type']
-        poo_color = analysis_result['poo_color']
-        poo_blood = analysis_result['poo_blood']
+        poo_type = analysis_result['poo_type']  # poo_type은 이제 string으로 반환됩니다.
+        poo_color = json.dumps(analysis_result['poo_color'])  # 리스트를 JSON 문자열로 변환
 
         # 데이터베이스에 이미지 정보 저장
         new_image = Image(
@@ -261,10 +259,9 @@ async def upload_image(
             file_path=safe_filename,
             upload_time=datetime.now(),
             file_name=safe_filename,
-            poo_type=poo_type,
-            poo_color=poo_color,
-            poo_blood=poo_blood,
-            dogsex=dog.dogsex
+            poo_type=poo_type,  # string 타입의 poo_type 저장
+            poo_color=poo_color,  # JSON 문자열로 변환한 poo_color 저장
+            dogsex=dog.dogsex  # dog 정보에 따라 sex 값을 저장합니다.
         )
         try:
             db.add(new_image)
@@ -272,22 +269,6 @@ async def upload_image(
             db.refresh(new_image)
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Failed to save image to the database: {str(e)}")
-
-        # # poo_blood가 1인 경우 /poopt 엔드포인트 호출
-        # if analysis_result['poo_blood'] == 1:
-        #     try:
-        #         async with httpx.AsyncClient() as client:
-        #             response = await client.post(
-        #                 f"{LOCAL_SERVER_URL}/chatgpt/poopt",
-        #                 json={"user_id": user.id, "message": "분석 결과 메시지"},
-        #             )
-        #             response.raise_for_status()
-        #     except httpx.HTTPStatusError as e:
-        #         print(f"HTTP error: {e.response.status_code} - {e.response.text}")
-        #         raise HTTPException(status_code=e.response.status_code, detail="Failed to call ChatGPT endpoint")
-        #     except Exception as e:
-        #         print(f"Unexpected error: {str(e)}")
-        #         raise HTTPException(status_code=500, detail="ChatGPT 호출 중 오류가 발생했습니다.")
             
         return {
             "id": new_image.id,
@@ -296,7 +277,6 @@ async def upload_image(
             "file_name": safe_filename,
             "poo_type": new_image.poo_type,
             "poo_color": new_image.poo_color,
-            "poo_blood": new_image.poo_blood,
         }
     except Exception as e:
         print(f"Error during image upload: {str(e)}")

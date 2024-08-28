@@ -45,7 +45,7 @@ class UserUpdate(BaseModel):
     email: str
 
 class UserResponse(BaseModel):
-    # username: str
+    user_id: int
     email: str 
     dog_info: DogResponse = None
 
@@ -64,9 +64,9 @@ class ImageResponse(BaseModel):
     file_path: str
     upload_time: datetime  # datetime을 문자열로 변환
     file_name: str
-    poo_type: int
+    poo_type: str
     poo_color: str
-    poo_blood: bool
+    # poo_blood: bool
     dogsex: int
 
     class Config:
@@ -81,9 +81,9 @@ class ImageResponseWithoutPoints(BaseModel):
     file_path: str
     upload_time: datetime
     file_name: str
-    poo_type: int
+    poo_type: str
     poo_color: str
-    poo_blood: int
+    # poo_blood: int
 
     class Config:
         orm_mode = True
@@ -126,8 +126,8 @@ class ChatLogResponse(BaseModel):
     timestamp: datetime
     image_id: int = None
     poo_color: str = None
-    poo_type: int = None
-    poo_blood: int = None
+    poo_type: str
+    # poo_blood: int = None
 
     class Config:
         orm_mode = True

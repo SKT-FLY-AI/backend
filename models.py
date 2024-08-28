@@ -38,9 +38,9 @@ class Image(Base):
     file_path = Column(String(255), nullable=False)
     upload_time = Column(DateTime, nullable=False)
     file_name = Column(String(100), nullable=False)
-    poo_type = Column(Integer, nullable=False, default=0)
+    poo_type = Column(String(100), nullable=False)
     poo_color = Column(String(50), nullable=False, default='#685960')  # 여기에 기본값 설정
-    poo_blood = Column(Integer, nullable=False, default=0)  # TINYINT(1)로 설정
+    # poo_blood = Column(Integer, nullable=False, default=0)  # TINYINT(1)로 설정
     dogsex = Column(Integer, nullable=False, default=0)  # TINYINT(1)로 설정
 
 
@@ -71,9 +71,9 @@ class Analyze(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
-    poo_type = Column(Integer, nullable=False, default=0)
+    poo_type = Column(String(100), nullable=False)
     poo_color = Column(String(50), nullable=False)  # 기본값 설정
-    poo_blood = Column(Integer, nullable=False, default=0)  # TINYINT(1)로 설정
+    # poo_blood = Column(Integer, nullable=False, default=0)  # TINYINT(1)로 설정
     analysis_time = Column(DateTime, nullable=False)  # 분석 시간 추가
 
 
@@ -87,8 +87,8 @@ class ChatLog(Base):
     timestamp = Column(DateTime, default=datetime.utcnow) 
     image_id = Column(Integer, ForeignKey('images.id'), nullable=True)  # 이미지 ID 추가
     poo_color = Column(String(50), nullable=True)  # poo_color 필드 추가
-    poo_type = Column(Integer, nullable=True)  # poo_type 필드 추가
-    poo_blood = Column(Integer, nullable=True)  # poo_blood 필드 추가
+    poo_type = Column(String(100), nullable=False)
+    # poo_blood = Column(Integer, nullable=True)  # poo_blood 필드 추가
 
     user = relationship("User", back_populates="chat_logs")
     image = relationship("Image")  # 이미지를 참조하는 관계 추가

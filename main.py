@@ -17,7 +17,7 @@ from poopt import router as poopt_router
 from map import router as map_router
 from register import router as kakao_router
 from dotenv import load_dotenv
-
+from new_gpt import router as chatgpt_new_router
 # Load environment variables
 load_dotenv()
 
@@ -32,16 +32,7 @@ jwt_secret_key = os.getenv("AUTHJWT_SECRET_KEY")
 app.add_middleware(SessionMiddleware, secret_key=session_secret_key)
 
 
-class Token(BaseModel):
-    access_token: str
-    token_type: str
 
-class Settings(BaseModel):
-    authjwt_secret_key: str = jwt_secret_key
-
-@AuthJWT.load_config
-def get_config():
-    return Settings()
 
 origins = [
     "http://localhost",
@@ -64,12 +55,13 @@ init_db()
 
 app.include_router(register.router, prefix="/users", tags=["users"])
 app.include_router(image.router, prefix="/images", tags=["images"])
-app.include_router(chatgpt.router, prefix="/chatgpt", tags=["ChatGpt"])
+# app.include_router(chatgpt.router, prefix="/chatgpt", tags=["ChatGpt"])
 app.include_router(googlemap.router, prefix="/maps", tags=["maps"])
 app.include_router(cardnews_router, prefix="/cardnews", tags=["cardnews"])
-app.include_router(poopt_router, prefix="/chatgpt", tags=["ChatGpt"])
+# app.include_router(poopt_router, prefix="/chatgpt", tags=["ChatGpt"])
 app.include_router(map_router, prefix="/map", tags=["maps"])
-app.include_router(kakao_router, prefix="/users", tags=["users"])
+app.include_router(chatgpt_new_router, prefix="/chatgpt", tags=["ChatGpt_new"])
+
 
 @app.get("/")
 async def read_root():
