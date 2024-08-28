@@ -72,7 +72,7 @@ class Analyze(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
     poo_type = Column(String(100), nullable=False)
-    poo_color = Column(String(50), nullable=False)  # 기본값 설정
+    poo_color = Column(String(100), nullable=False)  # 기본값 설정
     # poo_blood = Column(Integer, nullable=False, default=0)  # TINYINT(1)로 설정
     analysis_time = Column(DateTime, nullable=False)  # 분석 시간 추가
 
@@ -86,7 +86,7 @@ class ChatLog(Base):
     message = Column(Text, nullable=False)
     timestamp = Column(DateTime, default=datetime.utcnow) 
     image_id = Column(Integer, ForeignKey('images.id'), nullable=True)  # 이미지 ID 추가
-    poo_color = Column(String(50), nullable=True)  # poo_color 필드 추가
+    poo_color = Column(String(100), nullable=True)  # poo_color 필드 추가
     poo_type = Column(String(100), nullable=False)
     # poo_blood = Column(Integer, nullable=True)  # poo_blood 필드 추가
 

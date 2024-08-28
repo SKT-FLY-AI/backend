@@ -25,7 +25,6 @@ class ChatRequest(BaseModel):
     message: str
 
 
-
 async def gpt_stream_response(poo_type: str, poo_color: str, poo_blood: int, user_id: int, db: Session, image_id: int,prompt: str):
     try:
         prompt = (
@@ -117,10 +116,6 @@ async def chat_with_gpt(request: PooptRequest, db: Session = Depends(get_db)):
         user_id = request.user_id
         user_prompt = request.message  # 사용자가 보낸 프롬프트
 
-
-
-
-
         latest_image = get_latest_image_analysis(db, user_id)
 
         prompt = (
@@ -147,12 +142,12 @@ async def chat_with_gpt(request: PooptRequest, db: Session = Depends(get_db)):
     except HTTPException as e:
         print(f"HTTP Exception: {e.detail}")
         raise e
-    except Exception as e:
-        print(f"General Exception: {str(e)}")
-        raise HTTPException(status_code=500, detail="Internal server error")
     except ValidationError as e:
         print(f"Validation error: {e}")
         raise HTTPException(status_code=422, detail=str(e))
+    except Exception as e:
+        print(f"General Exception: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 @router.get("/chatlogs", response_model=List[ChatLogResponse])
 async def get_chat_logs(user_id: int = Query(...), db: Session = Depends(get_db)):

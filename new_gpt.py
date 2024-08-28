@@ -1,3 +1,4 @@
+import json
 from openai import OpenAI
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
@@ -11,6 +12,13 @@ from models import Image, ChatLog
 from datetime import datetime
 import os
 from schemas import ChatLogResponse
+# langchain model과의 통합
+from langchain_openai import ChatOpenAI
+from langchain.chat_models import ChatOpenAI
+from langchain.chains import ConversationalRetrievalChain, LLMChain
+from database import add_vectorDB
+from langchain.prompts import ChatPromptTemplate, SystemMessagePromptTemplate,  HumanMessagePromptTemplate
+from langchain.memory import ConversationBufferWindowMemory
 
 load_dotenv()
 
@@ -21,29 +29,87 @@ api_key = os.getenv("OPENAI_API_KEY")
 
 # OpenAI 클라이언트 초기화
 client = OpenAI(api_key=api_key)
+def make_templete():
+    #! 6. prompt template 정의
+    chat_prompt = ChatPromptTemplate.from_messages([
+        SystemMessagePromptTemplate.from_template(
+            "당신은 필요한 말만 하는, 강아지 대변에 특화된 수의사입니다."
+        ),
+        HumanMessagePromptTemplate.from_template(
+            """
+            나한테 우리 강아지 건강 상태를 파악하기 위해서, 
+            Chroma DB에 저장되어있는 문서를 기반으로,
+            {poo_color}를 갖고 있는 {poo_type}형태의 대변에 대한 분석 결과를 바탕으로 건강상태를 분석하기 위한 질문을 한가지 던져줘.
+            """
+        )
+    ])
+    return chat_prompt
+
+def init_chatbot(key):
+    """
+    대변 모양, 색깔 받아서 Langchain 모듈 생성, 그에 대한 첫 질문 반환
+    :return: langchain_model, 첫 번째 질문
+    """
+    data_list = ["vector_store/Dog_Stool_Analysis.pdf"]
+    for data_path in data_list:
+        vector_index = add_vectorDB(data_path)
+    retriever = vector_index.as_retriever(
+        search_type="similarity", # Cosine Similarity
+        search_kwargs={
+            "k": 3, # Select top k search results
+        } 
+    )
+    # LLM 초기화
+    gptai = ChatOpenAI(api_key=key, temperature=0.7, model="gpt-4", max_tokens=1000)
+    chat_prompt = make_templete()
+    llm_chain = LLMChain(llm=gptai, prompt=chat_prompt)
+
+    return llm_chain, retriever
+
+# ChatOpenAI와 검색해주는애 반환
+llm_chain, retriever = init_chatbot(api_key)
 
 class ChatRequest(BaseModel):
     user_id: int
     message: str
-    poo_color: str
+    poo_color: list
     poo_type: str
     image_id: int  # 추가된 필드
 
-async def gpt_stream_response(poo_color: str, poo_type: str, message: str, past_messages: List[dict], db: Session, user_id: int, image_id: int):
+async def gpt_stream_response(poo_color: list, poo_type: str, message: str, past_messages: List[dict], db: Session, user_id: int, image_id: int):
+    count = 0
     try:
-        chat_prompt = [
-            {"role": "system", "content": "당신은 필요한 말만 하는, 강아지 대변에 특화된 수의사입니다."},
-            {
-                "role": "user",
-                "content": f"""
-                나한테 우리 강아지 건강 상태를 파악하기 위해서, 
-                FAISS 내 저장되어있는 문서를 기반으로
-                {poo_color}를 갖고 있는 {poo_type}형태의 대변에 대한 분석 결과를 바탕으로 건강상태를 분석하기 위한 질문을 한가지 던져줘
-                """
-            }
-        ]
-        
-        messages = chat_prompt + past_messages + [{"role": "user", "content": message}]
+        count += 1
+        # 모델 실행 및 첫 질문 생성
+        initial_response = llm_chain.invoke({
+            "poo_type": poo_type,
+            "poo_color": poo_color
+        })
+        # 대변 색/모양 전달, 미리 설정한 프롬프트를 통해 첫 질문 생성
+        first_question = initial_response['text']
+        # 메모리 버퍼 생성
+        memory = ConversationBufferWindowMemory(memory_key="chat_history", k=10, output_key="answer", return_messages=True)
+        # ConversationalRetrievalChain allows to seamlessly add historical context or memory to chain.
+        rag_chain = ConversationalRetrievalChain.from_llm(
+            ChatOpenAI(api_key=api_key, temperature=0, model="gpt-4"), 
+            retriever=retriever,
+            chain_type="stuff", 
+            memory=memory,
+            return_source_documents=True
+        )
+
+        poo_color = json.dumps(poo_color)
+        first_poo_info = {
+            "role": "user",
+            "content": f"대변 모양: {poo_type} / 대변 색상: {poo_color}"
+        }
+        first_question = {"role": "assistant", "content": first_question}
+        # 1. 대변 정보 추가 (human)
+        memory.chat_memory.add_user_message(first_poo_info["content"])
+        # 2. 첫 번째 질문 추가 (ai)
+        memory.chat_memory.add_ai_message(first_question["content"])
+        # 3. 그에 대한 답변 (human)
+        memory.chat_memory.add_user_message(message)
         
         # 사용자 메시지를 ChatLog에 저장
         user_log = ChatLog(
@@ -57,33 +123,90 @@ async def gpt_stream_response(poo_color: str, poo_type: str, message: str, past_
         )
         db.add(user_log)
         db.commit()
+        if count == 2:
+            first_poo_info = [{"role" : "user", "content" : f"대변 모양: {poo_type} / 대변 색상: {poo_color}"},
+                            {"role" : "assistant", "content" : first_question}]
+            messages = memory.chat_memory.messages
+            print(messages)
+            messages_for_gpt = []
+            for message in messages:
+                type = "user" if message.type == "human" else "assistant"
+                messages_for_gpt.append({"role" : type, "content" : message.content})
+            # 1. 대변 정보 + 2.과거 내역 + 3. 답변 내용
+            # 1단계 : RAG 체인을 사용해 관련 문서 검색
+            stream = client.chat.completions.create(
+                model="gpt-3.5-turbo",
+                messages=messages_for_gpt,
+                stream=True,
+            )
+            assistant_response = ""
+            for chunk in stream:
+                content = chunk.choices[0].delta.content
+                if content:
+                    assistant_response += content
+                    yield content
+                    await asyncio.sleep(0)
+                    
+            # GPT 응답을 ChatLog에 저장
+            assistant_log = ChatLog(
+                user_id=user_id,
+                role='assistant',
+                message=assistant_response,
+                timestamp=datetime.now(),
+                poo_color=poo_color,
+                poo_type=poo_type,
+                image_id=image_id  # image_id 저장
+            )
+            db.add(assistant_log)
+            db.commit()
+            
+        else:
+            retrieved_docs = rag_chain({
+                "question": message,
+                "chat_history": memory.chat_memory.messages
+            })
+            
+            # 2단계 : 검색된 문서를 LLMChain에 전달하여 최종 응답 생성
+            # 문서 검색 결과가 있으면 해당 내용을 바탕으로 답변 생성 / 없으면 LLM model로 가버려잇.
+            if 'source_documents' in retrieved_docs and retrieved_docs['source_documents']:
+                context = "\n".join([doc.page_content for doc in retrieved_docs['source_documents']])
 
-        stream = client.chat.completions.create(
-            model="gpt-3.5-turbo",
-            messages=messages,
-            stream=True,
-        )
+                stream = llm_chain.invoke({
+                    "poo_type": poo_type,
+                    "poo_color": poo_color,
+                    "context": context,
+                    "question": message
+                })
 
-        assistant_response = ""
-        for chunk in stream:
-            content = chunk.choices[0].delta.content
-            if content:
-                assistant_response += content
-                yield content
-                await asyncio.sleep(0)
+            else:
+                # 문서 검색 결과가 없으면 LLMChain을 사용해 질문에 대한 일반적인 답변 생성
+                stream = llm_chain.invoke({
+                    "poo_type": poo_type,
+                    "poo_color": poo_color,
+                    "context": "관련 문서가 저장되어 있지 않습니다. 강아지 대변과 관련한 정보로 수의사처럼 상담을 진행하되 간단하게 질문을 하나씩 던지세요.",    # LLMChain한테 던지는 말.
+                    "question": message
+                })
+            
+            assistant_response = ""
+            for chunk in stream['text']:
+                content = chunk
+                if content:
+                    assistant_response += content
+                    yield content
+                    await asyncio.sleep(0)
 
-        # GPT 응답을 ChatLog에 저장
-        assistant_log = ChatLog(
-            user_id=user_id,
-            role='assistant',
-            message=assistant_response,
-            timestamp=datetime.now(),
-            poo_color=poo_color,
-            poo_type=poo_type,
-            image_id=image_id  # image_id 저장
-        )
-        db.add(assistant_log)
-        db.commit()
+            # GPT 응답을 ChatLog에 저장
+            assistant_log = ChatLog(
+                user_id=user_id,
+                role='assistant',
+                message=assistant_response,
+                timestamp=datetime.now(),
+                poo_color=poo_color,
+                poo_type=poo_type,
+                image_id=image_id  # image_id 저장
+            )
+            db.add(assistant_log)
+            db.commit()
 
     except Exception as e:
         # 예외가 발생하면 클라이언트에 오류 메시지를 보냄
