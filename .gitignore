@@ -25,5 +25,7 @@ dist/
 .vscode/
 .idea/
 
-./chatbot
-./index_store
+chatbot
+index_store
+*.bin
+*.pkl
